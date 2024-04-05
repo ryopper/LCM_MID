@@ -7,8 +7,8 @@ https://onsite.gakkai-web.net/ipsj/abstract/data/pdf/2ZA-05.html
 
 ## Acknowledgments
 This project was inspired by or based on the following repositories:
-- [MID](https://github.com/Gutianpei/MID) by [Tianpei Gu et al] - [MIT License]
-- [latent-consistency-model](https://github.com/luosiallen/latent-consistency-model) by [Simian Luo et al.] - [MIT License]
+- [MID](https://github.com/Gutianpei/MID) by Tianpei Gu et al. - MIT License
+- [latent-consistency-model](https://github.com/luosiallen/latent-consistency-model) by Simian Luo et al. - MIT License
 I am grateful for the contributions of these authors and their work which have significantly influenced the development of this project.
 
 # Code
@@ -18,7 +18,7 @@ I am grateful for the contributions of these authors and their work which have s
     CUDA == 11.3
 
 ## Prepare Data
-    Please refer to the [original document](https://github.com/Gutianpei/MID?tab=readme-ov-file#prepare-data). 
+Please refer to the [original document](https://github.com/Gutianpei/MID?tab=readme-ov-file#prepare-data). 
 
 ## Training
 
@@ -27,14 +27,14 @@ To apply the Latent Consistency Model to MID for distillation, the following two
 2. Use the trained MID model for distillation to create the LCM model.
 
 ### Step 1: Train the MID model.
-    Please refer to the [original document](https://github.com/Gutianpei/MID?tab=readme-ov-file#training)
+Please refer to the [original document](https://github.com/Gutianpei/MID?tab=readme-ov-file#training)
  
 ### Step 2: Use the trained MID model for distillation to create the LCM model.
-    Basically the learning methods are same as Step1.
+Basically the learning methods are same as Step1.
 ```python lcm_main.py --config configs/lcm_eth.yaml --dataset DATASET``` 
 
 ## Evaluation
-    I will write later.
+I will write later.
 
 
 ### Citations
