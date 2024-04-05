@@ -370,7 +370,8 @@ class MultimodalGenerativeCVAE(object):
                                neighbors,
                                neighbors_edge_value,
                                robot,
-                               map) -> (torch.Tensor,
+                               map,
+                               orzero) -> (torch.Tensor,
                                           torch.Tensor,
                                           torch.Tensor,
                                           torch.Tensor,
@@ -434,6 +435,8 @@ class MultimodalGenerativeCVAE(object):
                                                         node_history_st,
                                                         first_history_indices)
 
+        #print(node_history_encoded.shape)
+
         ##################
         # Encode Present #
         ##################
@@ -452,13 +455,20 @@ class MultimodalGenerativeCVAE(object):
             node_edges_encoded = list()
             for edge_type in self.edge_types:
                 # Encode edges for given edge type
+                # print(node_history.shape)
+                # print(node_history_st.shape)
+                # print(edge_type)
+                # print(len(neighbors[edge_type][0]))
+                # print(neighbors[edge_type][0][0].shape)
+                # print(neighbors_edge_value[edge_type][0])
                 encoded_edges_type = self.encode_edge(mode,
                                                       node_history,
                                                       node_history_st,
                                                       edge_type,
                                                       neighbors[edge_type],
                                                       neighbors_edge_value[edge_type],
-                                                      first_history_indices)
+                                                      first_history_indices,
+                                                      orzero)
                 node_edges_encoded.append(encoded_edges_type)  # List of [bs/nbs, enc_rnn_dim]
             #####################
             # Encode Node Edges #
@@ -544,7 +554,8 @@ class MultimodalGenerativeCVAE(object):
                     edge_type,
                     neighbors,
                     neighbors_edge_value,
-                    first_history_indices):
+                    first_history_indices,
+                    orzero):
 
         max_hl = self.hyperparams['maximum_history_length']
 
@@ -554,7 +565,10 @@ class MultimodalGenerativeCVAE(object):
                 neighbor_state_length = int(
                     np.sum([len(entity_dims) for entity_dims in self.state[edge_type[1]].values()])
                 )
-                edge_states_list.append(torch.zeros((1, max_hl + 1, neighbor_state_length), device=self.device))
+                if orzero:
+                    edge_states_list.append(torch.zeros((1, 1, neighbor_state_length), device=self.device)) #変更した
+                else:
+                    edge_states_list.append(torch.zeros((1, max_hl + 1, neighbor_state_length), device=self.device))
             else:
                 edge_states_list.append(torch.stack(neighbor_states, dim=0).to(self.device))
 
@@ -563,6 +577,7 @@ class MultimodalGenerativeCVAE(object):
             op_applied_edge_states_list = list()
             for neighbors_state in edge_states_list:
                 op_applied_edge_states_list.append(torch.sum(neighbors_state, dim=0))
+            #print(op_applied_edge_states_list)
             combined_neighbors = torch.stack(op_applied_edge_states_list, dim=0)
             if self.hyperparams['dynamic_edges'] == 'yes':
                 # Should now be (bs, time, 1)
@@ -966,7 +981,8 @@ class MultimodalGenerativeCVAE(object):
                    neighbors_edge_value,
                    robot,
                    map,
-                   prediction_horizon) -> torch.Tensor:
+                   prediction_horizon,
+                   orzero) -> torch.Tensor:
         """
         Calculates the training loss for a batch.
 
@@ -994,7 +1010,8 @@ class MultimodalGenerativeCVAE(object):
                                                                      neighbors=neighbors,
                                                                      neighbors_edge_value=neighbors_edge_value,
                                                                      robot=robot,
-                                                                     map=map)
+                                                                     map=map,
+                                                                     orzero=orzero)
         # if mode == ModeKeys.TRAIN:
         #     sample_ct = self.hyperparams['k']
         # elif mode == ModeKeys.EVAL:

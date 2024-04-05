@@ -191,43 +191,127 @@ def get_node_timestep_data(env, scene, t, node, state, pred_state,
             neighbors_edge_value, robot_traj_st_t, map_tuple)
 
 
-def get_timesteps_data(env, scene, t, node_type, state, pred_state,
-                       edge_types, min_ht, max_ht, min_ft, max_ft, hyperparams):
-    """
-    Puts together the inputs for ALL nodes in a given scene and timestep in it.
+# def get_timesteps_data(env, scene, t, node_type, state, pred_state,
+#                        edge_types, min_ht, max_ht, min_ft, max_ft, hyperparams):
+#     """
+#     Puts together the inputs for ALL nodes in a given scene and timestep in it.
 
-    :param env: Environment
-    :param scene: Scene
-    :param t: Timestep in scene
-    :param node_type: Node Type of nodes for which the data shall be pre-processed
-    :param state: Specification of the node state
-    :param pred_state: Specification of the prediction state
-    :param edge_types: List of all Edge Types for which neighbors are pre-processed
-    :param max_ht: Maximum history timesteps
-    :param max_ft: Maximum future timesteps (prediction horizon)
-    :param hyperparams: Model hyperparameters
-    :return:
-    """
+#     :param env: Environment
+#     :param scene: Scene
+#     :param t: Timestep in scene
+#     :param node_type: Node Type of nodes for which the data shall be pre-processed
+#     :param state: Specification of the node state
+#     :param pred_state: Specification of the prediction state
+#     :param edge_types: List of all Edge Types for which neighbors are pre-processed
+#     :param max_ht: Maximum history timesteps
+#     :param max_ft: Maximum future timesteps (prediction horizon)
+#     :param hyperparams: Model hyperparameters
+#     :return:
+#     """
+#     nodes_per_ts = scene.present_nodes(t,
+#                                        type=node_type,
+#                                        min_history_timesteps=min_ht,
+#                                        min_future_timesteps=max_ft,
+#                                        return_robot=not hyperparams['incl_robot_node'])
+#     batch = list()
+#     nodes = list()
+#     out_timesteps = list()
+#     for timestep in nodes_per_ts.keys():
+#             scene_graph = scene.get_scene_graph(timestep,
+#                                                 env.attention_radius,
+#                                                 hyperparams['edge_addition_filter'],
+#                                                 hyperparams['edge_removal_filter'])
+#             present_nodes = nodes_per_ts[timestep]
+#             for node in present_nodes:
+#                 nodes.append(node)
+#                 out_timesteps.append(timestep)
+#                 batch.append(get_node_timestep_data(env, scene, timestep, node, state, pred_state,
+#                                                     edge_types, max_ht, max_ft, hyperparams,
+#                                                     scene_graph=scene_graph))
+#     if len(out_timesteps) == 0:
+#         return None
+#     return collate(batch), nodes, out_timesteps
+
+#上記の関数にマックスバチサイズを加えたもの。メモリエラーの時に使える。
+def get_timesteps_data(env, scene, t, node_type, state, pred_state,
+                       edge_types, min_ht, max_ht, min_ft, max_ft, hyperparams, max_batch_size):
     nodes_per_ts = scene.present_nodes(t,
                                        type=node_type,
                                        min_history_timesteps=min_ht,
                                        min_future_timesteps=max_ft,
                                        return_robot=not hyperparams['incl_robot_node'])
-    batch = list()
-    nodes = list()
-    out_timesteps = list()
+                                       
+    # 一時的なバッチ、ノード、タイムステップ用のリスト
+    temp_batch = []
+    temp_nodes = []
+    temp_out_timesteps = []
+
+    # 最終的なバッチ、ノード、タイムステップ用のリスト
+    final_batches = []
+    final_nodes = []
+    final_out_timesteps = []
+
     for timestep in nodes_per_ts.keys():
-            scene_graph = scene.get_scene_graph(timestep,
-                                                env.attention_radius,
-                                                hyperparams['edge_addition_filter'],
-                                                hyperparams['edge_removal_filter'])
-            present_nodes = nodes_per_ts[timestep]
-            for node in present_nodes:
-                nodes.append(node)
-                out_timesteps.append(timestep)
-                batch.append(get_node_timestep_data(env, scene, timestep, node, state, pred_state,
-                                                    edge_types, max_ht, max_ft, hyperparams,
-                                                    scene_graph=scene_graph))
-    if len(out_timesteps) == 0:
-        return None
-    return collate(batch), nodes, out_timesteps
+        scene_graph = scene.get_scene_graph(timestep,
+                                            env.attention_radius,
+                                            hyperparams['edge_addition_filter'],
+                                            hyperparams['edge_removal_filter'])
+        present_nodes = nodes_per_ts[timestep]
+
+        for node in present_nodes:
+            # 一時的なリストにデータを追加
+            temp_nodes.append(node)
+            temp_out_timesteps.append(timestep)
+            temp_batch.append(get_node_timestep_data(env, scene, timestep, node, state, pred_state,
+                                                     edge_types, max_ht, max_ft, hyperparams,
+                                                     scene_graph=scene_graph))
+            
+            # 最大バッチサイズに達したら、最終リストに追加
+            if len(temp_batch) >= max_batch_size:
+                final_batches.append(collate(temp_batch))
+                final_nodes.append(temp_nodes)
+                final_out_timesteps.append(temp_out_timesteps)
+                temp_batch = []
+                temp_nodes = []
+                temp_out_timesteps = []
+
+    # 残りのバッチを最終リストに追加
+    if temp_batch:
+        final_batches.append(collate(temp_batch))
+        final_nodes.append(temp_nodes)
+        final_out_timesteps.append(temp_out_timesteps)
+
+    return final_batches, final_nodes, final_out_timesteps
+
+# def get_timesteps_data(env, scene, t, node_type, state, pred_state,
+#                        edge_types, min_ht, max_ht, min_ft, max_ft, hyperparams, max_batch_size):
+#     # 特定の時間に存在するノードのみを取得
+#     nodes_at_t = scene.present_nodes(t,
+#                                      type=node_type,
+#                                      min_history_timesteps=min_ht,
+#                                      min_future_timesteps=min_ft,
+#                                      return_robot=not hyperparams['incl_robot_node'])
+
+#     # バッチ、ノード、タイムステップ用のリスト
+#     batch = []
+#     nodes = []
+#     out_timesteps = []
+
+#     # 特定の時間ステップに存在するノードの処理
+#     scene_graph = scene.get_scene_graph(t,
+#                                         env.attention_radius,
+#                                         hyperparams['edge_addition_filter'],
+#                                         hyperparams['edge_removal_filter'])
+#     for node in nodes_at_t:
+#         nodes.append(node)
+#         out_timesteps.append(t)
+#         batch_data = get_node_timestep_data(env, scene, t, node, state, pred_state,
+#                                             edge_types, max_ht, max_ft, hyperparams,
+#                                             scene_graph=scene_graph)
+#         batch.append(batch_data)
+
+#         # バッチサイズが最大に達した場合、処理を中断
+#         if len(batch) >= max_batch_size:
+#             break
+
+#     return [batch], [nodes], [out_timesteps]

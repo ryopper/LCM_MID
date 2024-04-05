@@ -55,6 +55,31 @@ def compute_obs_violations(predicted_trajs, map):
 
     return num_viol_trajs
 
+def compute_diversity(trajectories):
+    """
+    Compute the diversity of trajectories by calculating the average Euclidean distance 
+    between all pairs of trajectories.
+
+    :param trajectories: An array of trajectories with shape (1, sample_size, time_steps, 2)
+    :return: The average Euclidean distance between all pairs of trajectories
+    """
+    # Remove the first dimension as it's size is 1
+    trajectories = trajectories.squeeze(0)
+
+    num_samples, time_steps, _ = trajectories.shape
+    total_distances = []
+
+    for i in range(num_samples):
+        for j in range(i + 1, num_samples):
+            # Calculate Euclidean distance for each pair of trajectories
+            distances = np.sqrt(np.sum((trajectories[i] - trajectories[j])**2, axis=1))
+            total_distances.append(np.mean(distances))
+
+    # Average distance across all pairs
+    avg_distance = np.mean(total_distances)
+
+    return avg_distance
+
 
 def compute_batch_statistics(prediction_output_dict,
                              dt,
@@ -77,12 +102,13 @@ def compute_batch_statistics(prediction_output_dict,
 
     batch_error_dict = dict()
     for node_type in node_type_enum:
-        batch_error_dict[node_type] = {'ade': list(), 'fde': list(), 'kde': list(), 'obs_viols': list()}
+        batch_error_dict[node_type] = {'ade': list(), 'fde': list(), 'kde': list(), 'obs_viols': list(), 'diversity': list()}
 
     for t in prediction_dict.keys():
         for node in prediction_dict[t].keys():
             #pdb.set_trace()
             #target_shape =
+            diversity = compute_diversity(prediction_dict[t][node])
             ade_errors = compute_ade(prediction_dict[t][node], futures_dict[t][node])
             fde_errors = compute_fde(prediction_dict[t][node], futures_dict[t][node])
             if kde:
@@ -101,6 +127,7 @@ def compute_batch_statistics(prediction_output_dict,
             batch_error_dict[node.type]['fde'].extend(list(fde_errors))
             batch_error_dict[node.type]['kde'].extend([kde_ll])
             batch_error_dict[node.type]['obs_viols'].extend([obs_viols])
+            batch_error_dict[node.type]['diversity'].extend([diversity])
 
     return batch_error_dict
 

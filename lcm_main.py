@@ -1,4 +1,4 @@
-from mid import MID
+from lcm_mid import MID
 import argparse
 import os
 import yaml
@@ -28,9 +28,6 @@ def main():
 
     # この時点でモデル自体はダウンロードされる
     agent = MID(config)
-
-    sampling="ddim"
-    steps=5
 
     if config["eval_mode"]:
         agent.eval()

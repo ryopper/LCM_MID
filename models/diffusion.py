@@ -78,12 +78,12 @@ class DiffusionTraj(Module):
 
         e_rand = torch.randn_like(x_0).cuda()  # (B, N, d)
 
-
         e_theta = self.net(c0 * x_0 + c1 * e_rand, beta=beta, context=context)
         loss = F.mse_loss(e_theta.view(-1, point_dim), e_rand.view(-1, point_dim), reduction='mean')
         return loss
 
-    def sample(self, num_points, context, sample, bestof, point_dim=2, flexibility=0.0, ret_traj=False, sampling="ddpm", step=100):
+    def sample(self, num_points, context, sample, bestof, point_dim=2, flexibility=0.0, ret_traj=False, sampling="ddim", step=50):
+        
         traj_list = []
         for i in range(sample):
             batch_size = context.size(0)
@@ -181,8 +181,6 @@ class TransformerConcatLinear(Module):
         self.concat3 = ConcatSquashLinear(2*context_dim,context_dim,context_dim+3)
         self.concat4 = ConcatSquashLinear(context_dim,context_dim//2,context_dim+3)
         self.linear = ConcatSquashLinear(context_dim//2, 2, context_dim+3)
-        #self.linear = nn.Linear(128,2)
-
 
     def forward(self, x, beta, context):
         batch_size = x.size(0)
@@ -226,25 +224,17 @@ class TransformerLinear(Module):
         ctx_emb = self.ctx_up(ctx_emb)
         emb = self.y_up(x)
         final_emb = torch.cat([ctx_emb, emb], dim=1).permute(1,0,2)
-        #pdb.set_trace()
         final_emb = self.pos_emb(final_emb)
 
         trans = self.transformer_encoder(final_emb)  # 13 * b * 128
         trans = trans[1:].permute(1,0,2)   # B * 12 * 128, drop the first one which is the z
         return self.linear(trans)
 
-
-
-
-
-
-
 class LinearDecoder(Module):
     def __init__(self):
             super().__init__()
             self.act = F.leaky_relu
             self.layers = ModuleList([
-                #nn.Linear(2, 64),
                 nn.Linear(32, 64),
                 nn.Linear(64, 128),
                 nn.Linear(128, 256),
@@ -252,8 +242,6 @@ class LinearDecoder(Module):
                 nn.Linear(512, 256),
                 nn.Linear(256, 128),
                 nn.Linear(128, 12)
-                #nn.Linear(2, 64),
-                #nn.Linear(2, 64),
             ])
     def forward(self, code):
 

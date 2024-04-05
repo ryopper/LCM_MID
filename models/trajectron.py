@@ -10,6 +10,23 @@ from torch.utils.data._utils.collate import default_collate
 import dill
 container_abcs = collections.abc
 
+# zeroにするために新たに作成
+# def zero_neighbors_data(data):
+#     if isinstance(data, list):
+#         return [torch.zeros_like(tensor) if isinstance(tensor, torch.Tensor) else zero_neighbors_data(tensor) for tensor in data]
+#     elif isinstance(data, torch.Tensor):
+#         return torch.zeros_like(data)
+#     else:
+#         raise TypeError("Unsupported data type")
+
+def zero_neighbors_data(data):
+    if isinstance(data, list):
+        return [torch.full_like(tensor, float('nan')) if isinstance(tensor, torch.Tensor) else zero_neighbors_data(tensor) for tensor in data]
+    elif isinstance(data, torch.Tensor):
+        return torch.full_like(data, float('nan'))
+    else:
+        raise TypeError("Unsupported data type")
+
 
 def restore(data):
     """
@@ -325,13 +342,79 @@ class Trajectron(object):
                                 prediction_horizon=self.ph)
 
         return loss
-    def get_latent(self, batch, node_type):
+
+    def get_latent(self, batch, node_type, orzero=False):
         (first_history_index,
          x_t, y_t, x_st_t, y_st_t,
          neighbors_data_st,
          neighbors_edge_value,
          robot_traj_st_t,
          map) = batch
+
+        #　以下変更(全部ゼロorカラにする。(uncondition))
+        # if orzero:
+        #     # batchsizeを計算
+        #     print(first_history_index)
+        #     batch_size = len(first_history_index)
+        #     first_history_index = torch.full((batch_size,), 7, dtype=torch.int64)
+        #     #first_history_index = torch.zeros(batch_size, dtype=torch.int64)
+        #     x_t = torch.zeros((batch_size, 9, 6))
+        #     y_t = torch.zeros((batch_size, 12, 2))
+        #     x_st_t = torch.zeros((batch_size, 9, 6))
+        #     y_st_t = torch.zeros((batch_size, 12, 2))
+        #     for neighbor_type in neighbors_data_st:
+        #         neighbors_data_st[neighbor_type] = zero_neighbors_data(neighbors_data_st[neighbor_type])
+        #         neighbors_edge_value[neighbor_type] = zero_neighbors_data(neighbors_edge_value[neighbor_type])
+
+        if orzero:
+
+            #batchsizeを計算
+            batch_size = len(first_history_index)
+            first_history_index = torch.full((batch_size,), 0, dtype=torch.int64)
+            #print(x_t.shape)
+            x_t = x_t[:, 8, :6].unsqueeze(1) # = float('nan')
+            # print(x_t.shape)
+            x_st_t = x_st_t[:, 8, :6].unsqueeze(1) # = float('nan')
+            #print(x_st_t.shape)
+
+            # x_t = torch.full((batch_size, 9, 6), float('nan'))  # すべての要素をnanに設定
+            # y_t = torch.full((batch_size, 12, 2), float('nan'))  # すべての要素をnanに設定
+            # x_st_t = torch.full((batch_size, 9, 6), float('nan'))  # すべての要素をnanに設定
+            # y_st_t = torch.full((batch_size, 12, 2), float('nan'))  # すべての要素をnanに設定
+            # for i in range(5):
+            #     print(neighbors_data_st[("PEDESTRIAN", "PEDESTRIAN")][0][i])
+            # print("########")
+
+            new_neighbors_data_st = dict()
+            new_neighbors_data_st[("PEDESTRIAN", "PEDESTRIAN")] = []
+            for i in range(batch_size):
+                tem_list = []
+                for j in range(len(neighbors_data_st[("PEDESTRIAN", "PEDESTRIAN")][i])):
+                    #print(neighbors_data_st[("PEDESTRIAN", "PEDESTRIAN")][i][j][6:8, :].shape)
+                    #print(neighbors_data_st[("PEDESTRIAN", "PEDESTRIAN")][i][j][8, :].unsqueeze(0).shape)
+                    tem_list.append(neighbors_data_st[("PEDESTRIAN", "PEDESTRIAN")][i][j][8, :].unsqueeze(0))
+                new_neighbors_data_st[("PEDESTRIAN", "PEDESTRIAN")].append(tem_list)
+
+            neighbors_data_st = new_neighbors_data_st
+
+            #print((neighbors_edge_value[("PEDESTRIAN", "PEDESTRIAN")][0]))
+
+            # for i in range(5):
+            #     print(neighbors_data_st[("PEDESTRIAN", "PEDESTRIAN")][0][i])
+            #     #print(neighbors_edge_value[("PEDESTRIAN", "PEDESTRIAN")][i])
+
+
+            # print(len(neighbors_edge_value[("PEDESTRIAN", "PEDESTRIAN")]))
+            # for i in range(len(neighbors_edge_value[("PEDESTRIAN", "PEDESTRIAN")])):
+            #     for j in range(len(neighbors_edge_value[("PEDESTRIAN", "PEDESTRIAN")][i])):
+            #         print(neighbors_edge_value[("PEDESTRIAN", "PEDESTRIAN")][i][j])
+            #     print("########")
+            #     if i == 5:
+            #         break
+
+            # for neighbor_type in neighbors_data_st:
+            #    neighbors_data_st[neighbor_type] = zero_neighbors_data(neighbors_data_st[neighbor_type])
+            #    neighbors_edge_value[neighbor_type] = zero_neighbors_data(neighbors_edge_value[neighbor_type])
 
         x = x_t.to(self.device)
         y = y_t.to(self.device)
@@ -353,11 +436,10 @@ class Trajectron(object):
                                 neighbors_edge_value=restore(neighbors_edge_value),
                                 robot=robot_traj_st_t,
                                 map=map,
-                                prediction_horizon=self.ph)
+                                prediction_horizon=self.ph,
+                                orzero=orzero)
+
         return feat_x
-
-
-
 
     def eval_loss(self, batch, node_type):
         (first_history_index,
