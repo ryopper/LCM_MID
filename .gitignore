@@ -2,3 +2,4 @@ __pycache__/
 .ssh/
 experiments/
 processed_data_noise/
+.DS_Store
